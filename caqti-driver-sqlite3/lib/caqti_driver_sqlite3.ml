@@ -38,13 +38,13 @@ let get_uri_bool uri name =
       ksprintf invalid_arg "Boolean expected for URI parameter %s." name
    | None -> None)
 
-let get_uri_int uri name =
+(* let get_uri_int uri name =
   (match Uri.get_query_param uri name with
    | Some s ->
       (try Some (int_of_string s) with
        | Failure _ ->
           ksprintf invalid_arg "Integer expected for URI parameter %s." name)
-   | None -> None)
+   | None -> None) *)
 
 type Caqti_error.msg += Error_msg of {
   errcode: Sqlite3.Rc.t;
@@ -238,7 +238,7 @@ let decode_row ~uri ~query row_type =
   let decode = Request_utils.decode_row ~uri field_decoder row_type in
   fun stmt ->
     let (y, (_, n)) = decode (stmt, 0) in
-    let n' = Sqlite3.data_count stmt in
+    let n' = Sqlite3.column_count stmt in
     if n = n' then Some y else
     let msg = sprintf "Decoded only %d of %d fields." n n' in
     let msg = Caqti_error.Msg msg in
@@ -564,16 +564,7 @@ struct
     let set_statement_timeout _ = Fiber.return (Ok ())
   end
 
-  let setup ~config db =
-    let tweaks_version = Caqti_connect_config.(get tweaks_version) config in
-    if tweaks_version < (1, 8) then Fiber.return () else
-    Preemptive.detach (Sqlite3.exec db) "PRAGMA foreign_keys = ON"
-      >>= fun rc ->
-    if rc = Sqlite3.Rc.OK then Fiber.return () else
-    Log.warn (fun f ->
-      f "Could not turn on foreign key support: %s" (Sqlite3.Rc.to_string rc))
-
-  let connect ~sw:_ ~stdenv:_ ?(env = no_env) ~config uri =
+  let connect ~sw:_ ~stdenv:_ ?(env = no_env) ~config:_ uri =
     try
       (* Check URI and extract parameters. *)
       assert (Uri.scheme uri = Some "sqlite3");
@@ -586,17 +577,13 @@ struct
          | (Some false), (Some false | None)      -> Some `READONLY
          | (Some true | None), (Some true | None) -> None
          | (Some true | None), (Some false)       -> Some `NO_CREATE) in
-      let busy_timeout = get_uri_int uri "busy_timeout" in
 
       (* Connect, configure, wrap. *)
       Preemptive.detach
         (fun () ->
           Sqlite3.db_open ~mutex:`FULL ?mode (Uri.path uri |> Uri.pct_decode))
         () >>= fun db ->
-      setup ~config db >|= fun () ->
-      (match busy_timeout with
-       | None -> ()
-       | Some timeout -> Sqlite3.busy_timeout db timeout);
+      Fiber.return () >|= fun () ->
       let module Arg = struct
         let env = env
         let uri = uri

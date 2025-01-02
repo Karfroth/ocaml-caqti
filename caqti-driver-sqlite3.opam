@@ -20,5 +20,6 @@ build: [
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
   ["dune" "build" "@doc" "-p" name "-j" jobs] {with-doc}
 ]
+pin-depends: ["sqlite3.dev" "git+https://github.com/Karfroth/sqlite3-ocaml.git#duckdb-wrapper"]
 dev-repo: "git+https://github.com/paurkedal/ocaml-caqti.git"
 synopsis: "Sqlite3 driver for Caqti using C bindings"

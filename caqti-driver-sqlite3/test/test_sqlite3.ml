@@ -27,7 +27,7 @@ let drop_req =
   Req.(unit ->. unit) "DROP TABLE IF EXISTS test_sqlite3"
 
 let create_req =
-  Req.(unit ->. unit) "CREATE TABLE test_sqlite3 (integer primary key not null)"
+  Req.(unit ->. unit) "CREATE TABLE test_sqlite3 (id integer primary key not null)"
 
 let bad_insert_req =
   Req.(unit ->! unit) "INSERT INTO test_sqlite3 VALUES (1), (1)"
@@ -40,9 +40,11 @@ let test_error (module C : Caqti_blocking.CONNECTION) =
   (match C.find bad_insert_req () with
    | Ok () -> Alcotest.fail "unexpected ok from bad_insert"
    | Error (`Response_failed
-        {msg = Caqti_driver_sqlite3.Error_msg {errcode; _}; _}) ->
+        {msg = Caqti_driver_sqlite3.Error_msg {errcode; errmsg}; _}) ->
       Alcotest.(check string) "result code"
-        "CONSTRAINT" (Sqlite3.Rc.to_string errcode)
+        "ERROR" (Sqlite3.Rc.to_string errcode);
+      Alcotest.(check (option string)) "error msg"
+        (Some "Constraint Error: PRIMARY KEY or UNIQUE constraint violated: duplicate key \"1\"") errmsg
    | Error err ->
       Alcotest.failf "unexpected error from bad_insert: %a" Caqti_error.pp err)
 
